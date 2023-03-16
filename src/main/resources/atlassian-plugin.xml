@@ -26,5 +26,10 @@
 
     <resource type="i18n" name="i18n" location="i18n/plugin"/>
 
+    <web-resource key="hide-issue-attachments">
+        <dependency>com.atlassian.auiplugin:ajs</dependency>
+        <resource type="download" name="hide-issue-attachments.js" location="js/hide-issue-attachments.js"/>
+        <context>jira.view.issue</context>
+    </web-resource>
 
 </atlassian-plugin>
