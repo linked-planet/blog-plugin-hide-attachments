@@ -1,0 +1,515 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.linked-planet.plugin.jira</groupId>
+    <artifactId>blog-plugin</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+
+    <organization>
+        <name>linked-planet GmbH</name>
+        <url>https://linked-planet.com</url>
+    </organization>
+
+    <name>Hide Issue Attachment Blog</name>
+    <description>Hides image attachments that are visible inside the description of an issue.</description>
+    <packaging>atlassian-plugin</packaging>
+
+    <inceptionYear>2023</inceptionYear>
+
+
+    <properties>
+        <!-- This key is used to keep the consistency between the key in atlassian-plugin.xml and the key to generate bundle. -->
+        <atlassian.plugin.key>${project.groupId}.${project.artifactId}</atlassian.plugin.key>
+        <atlassian.spring.scanner.version>2.2.5</atlassian.spring.scanner.version>
+
+        <jira.version>8.20.13</jira.version>
+
+        <arrow.version>1.1.2</arrow.version>
+        <amps.version>8.8.0</amps.version>
+        <http.port>2990</http.port>
+
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+
+        <kotlin.version>1.7.20</kotlin.version>
+        <kotlin.compiler.jvmTarget>1.8</kotlin.compiler.jvmTarget>
+
+        <!-- Deployment properties intended to be set via command line -->
+        <deploy.url>_</deploy.url>
+        <deploy.username>_</deploy.username>
+        <deploy.password>_</deploy.password>
+    </properties>
+
+
+    <dependencies>
+        <dependency>
+            <groupId>com.atlassian.jira</groupId>
+            <artifactId>jira-api</artifactId>
+            <version>${jira.version}</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>jta</groupId>
+                    <artifactId>jta</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>com.atlassian.plugin</groupId>
+            <artifactId>atlassian-spring-scanner-annotation</artifactId>
+            <version>${atlassian.spring.scanner.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>javax.inject</groupId>
+            <artifactId>javax.inject</artifactId>
+            <version>1</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>javax.ws.rs</groupId>
+            <artifactId>jsr311-api</artifactId>
+            <version>1.1.1</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- KOTLIN -->
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib</artifactId>
+            <version>${kotlin.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-reflect</artifactId>
+            <version>${kotlin.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib-common</artifactId>
+            <version>${kotlin.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib-jdk8</artifactId>
+            <version>${kotlin.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib-jdk7</artifactId>
+            <version>${kotlin.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlinx</groupId>
+            <artifactId>kotlinx-coroutines-core</artifactId>
+            <version>1.6.4</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jetbrains.kotlinx</groupId>
+            <artifactId>kotlinx-serialization-json</artifactId>
+            <version>1.4.1</version>
+        </dependency>
+
+        <!-- ARROW -->
+        <dependency>
+            <groupId>io.arrow-kt</groupId>
+            <artifactId>arrow-core</artifactId>
+            <version>${arrow.version}</version>
+        </dependency>
+
+        <!-- TEST DEPENDENCIES -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <version>5.2.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-java</artifactId>
+            <version>4.6.0</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- without forcing a recent version of Guava, selenium-java will fail during test execution -->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>31.1-jre</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+
+    <build>
+        <testSourceDirectory>src/test/kotlin</testSourceDirectory>
+
+        <plugins>
+            <!-- BUILD HELPER -->
+            <!-- make plugins aware of the src/main/kotlin source folder -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>src/main/kotlin</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Clean Maven directories that get corrupted when rebuilding the project with IntelliJ
+                 or on successive Maven builds -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <delete failonerror="false">
+                                    <fileset dir="${project.build.directory}/dependency-maven-plugin-markers"/>
+                                    <fileset dir="${project.build.directory}/classes"/>
+                                </delete>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- KOTLIN -->
+            <plugin>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-maven-plugin</artifactId>
+                <version>${kotlin.version}</version>
+                <executions>
+                    <execution>
+                        <id>compile</id>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>test-compile</id>
+                        <goals>
+                            <goal>test-compile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <compilerPlugins>
+                        <plugin>kotlinx-serialization</plugin>
+                    </compilerPlugins>
+                </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.jetbrains.kotlin</groupId>
+                        <artifactId>kotlin-maven-serialization</artifactId>
+                        <version>${kotlin.version}</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.10.1</version>
+                <executions>
+                    <!-- Replacing default-compile as it is treated specially by maven -->
+                    <execution>
+                        <id>default-compile</id>
+                        <phase>none</phase>
+                    </execution>
+                    <!-- Replacing default-testCompile as it is treated specially by maven -->
+                    <execution>
+                        <id>default-testCompile</id>
+                        <phase>none</phase>
+                    </execution>
+                    <execution>
+                        <id>java-compile</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>java-test-compile</id>
+                        <phase>test-compile</phase>
+                        <goals>
+                            <goal>testCompile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- JIRA -->
+            <plugin>
+                <groupId>com.atlassian.maven.plugins</groupId>
+                <artifactId>jira-maven-plugin</artifactId>
+                <version>${amps.version}</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <productVersion>${jira.version}</productVersion>
+                    <productDataVersion>${jira.version}</productDataVersion>
+                    <contextPath>/</contextPath>
+                    <enableQuickReload>true</enableQuickReload>
+                    <jvmArgs>-Xms2g -Xmx2g -XX:+UseG1GC -XX:+ExplicitGCInvokesConcurrent</jvmArgs>
+                    <httpPort>${http.port}</httpPort>
+                    <!-- https://developer.atlassian.com/docs/advanced-topics/configuration-of-instructions-in-atlassian-plugins -->
+                    <instructions>
+                        <Atlassian-Plugin-Key>${atlassian.plugin.key}</Atlassian-Plugin-Key>
+                        <Export-Package>
+                            com.linkedplanet.plugin.jira.blog.api,
+                        </Export-Package>
+                        <Import-Package>
+                            org.springframework.osgi.*;resolution:="optional",
+                            org.eclipse.gemini.blueprint.*;resolution:="optional",
+                            *;version="0";resolution:=optional
+                        </Import-Package>
+                        <Spring-Context>*</Spring-Context>
+                    </instructions>
+                    <applications>
+                        <!-- Atlassian applications (jira-core, jira-software, jira-servicedesk) -->
+                        <application>
+                            <applicationKey>jira-core</applicationKey>
+                            <version>${jira.version}</version>
+                        </application>
+                    </applications>
+                    <pluginArtifacts>
+                        <!-- If you need any plugins started, list them here -->
+                    </pluginArtifacts>
+                    <systemPropertyVariables>
+                        <atlassian.mail.senddisabled>false</atlassian.mail.senddisabled>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+
+
+            <!-- SPRING SCANNER -->
+            <plugin>
+                <groupId>com.atlassian.plugin</groupId>
+                <artifactId>atlassian-spring-scanner-maven-plugin</artifactId>
+                <version>${atlassian.spring.scanner.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>atlassian-spring-scanner</goal>
+                        </goals>
+                        <phase>process-classes</phase>
+                    </execution>
+                </executions>
+                <configuration>
+                    <verbose>false</verbose>
+                </configuration>
+            </plugin>
+
+            <!-- LICENSE -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>2.0.0</version>
+                <configuration>
+                    <licenseName>apache_v2</licenseName>
+                    <licenseFile>${project.basedir}/LICENSE</licenseFile>
+                    <projectName>${project.artifactId}</projectName>
+                    <copyrightOwners>The Plugin Authors</copyrightOwners>
+                    <failOnMissingHeader>true</failOnMissingHeader>
+                    <failOnNotUptodateHeader>true</failOnNotUptodateHeader>
+                    <roots>
+                        <root>src</root>
+                        <root>frontend/src/main</root>
+                    </roots>
+                    <excludes>
+                        <exclude>**/plugin.properties</exclude>
+                        <exclude>**/log4j.properties</exclude>
+                        <exclude>**/kaptKotlin/**/*</exclude>
+                        <exclude>**/*-min.js</exclude>
+                        <!-- license-plugin cannot deal with this code -->
+                        <exclude>**/*Application.kt</exclude>
+                    </excludes>
+                    <excludedScopes>provided,test</excludedScopes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>license-check-file-header</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>check-file-header</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- INSTALL SELENIUM WEBDRIVER FOR TEST EXECUTION -->
+            <plugin>
+                <groupId>com.github.webdriverextensions</groupId>
+                <artifactId>webdriverextensions-maven-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>install-drivers</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <installationDirectory>${project.build.testOutputDirectory}/drivers</installationDirectory>
+                    <drivers>
+                        <driver>
+                            <name>geckodriver</name>
+                            <platform>linux</platform>
+                            <bit>64</bit>
+                            <version>0.31.0</version>
+                        </driver>
+                    </drivers>
+                </configuration>
+            </plugin>
+
+            <!-- INTEGRATION TEST -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.0.0-M7</version>
+                <configuration>
+                    <includes>
+                        <include>it/**/*IntegrationTest.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
+
+            <!-- VERSIONS -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.12.0</version>
+            </plugin>
+
+            <!-- UPM -->
+            <plugin>
+                <groupId>com.linked-planet.maven</groupId>
+                <artifactId>upm-maven-plugin</artifactId>
+                <version>2.0.1</version>
+                <configuration>
+                    <baseUrl>${deploy.url}</baseUrl>
+                    <username>${deploy.username}</username>
+                    <password>${deploy.password}</password>
+                </configuration>
+            </plugin>
+        </plugins>
+
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-resources-plugin</artifactId>
+                    <version>3.3.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-install-plugin</artifactId>
+                    <version>3.0.1</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-deploy-plugin</artifactId>
+                    <version>3.0.0</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+
+    <profiles>
+        <!-- plugins we only want to execute on the CI server because they either take too
+             long or cause problems locally -->
+        <profile>
+            <id>ci</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <!-- KDOC -->
+                    <plugin>
+                        <groupId>org.jetbrains.dokka</groupId>
+                        <artifactId>dokka-maven-plugin</artifactId>
+                        <version>1.7.20</version>
+                        <executions>
+                            <execution>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>javadocJar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <!-- Prevents the plugin from connecting to the internet (cannot build offline otherwise) -->
+                            <cacheRoot>default</cacheRoot>
+                        </configuration>
+                    </plugin>
+
+                    <!-- SOURCES -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.2.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
+
+    <repositories>
+        <repository>
+            <id>atlassian-public</id>
+            <url>https://maven.atlassian.com/repository/public</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>atlassian-public</id>
+            <url>https://maven.atlassian.com/repository/public</url>
+        </pluginRepository>
+    </pluginRepositories>
+
+</project>

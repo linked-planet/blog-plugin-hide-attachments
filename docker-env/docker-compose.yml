@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+
+    jira:
+    image: atlassian/jira-software:latest
+    ports:
+      - "2990:8080"
+  
+  
